@@ -9,10 +9,10 @@ pacman::p_load(magrittr, dplyr, tidyverse, ggplot2, table1, VGAM, brant, MASS)
 ggthemr::ggthemr("fresh")
 ```
 
-For the second case study you will be predicting self-rated health category for individuals in their midlife (`outcome` variable). Select the correct model based on the distribution of the outcome variable. In step 1 you will conduct the main effects model with the variables `depress`, `alcage`, `cigage`, `age`, and `bp` predicting the variable `health`. In step 2 you will report the predicted probabilities for each self-rated health category among those with diagnosed high or low blood pressure, respectively. In step 3 you will test any relevant assumptions. Based on the results of Step 3, what would you recommend as the next step in predicting self-rated health category?
+For the second case study you will be predicting self-rated health category for individuals in their midlife (outcome variable). Select the correct model based on the distribution of the outcome variable. In step 1 you will conduct the main effects model with the variables depress, alcage, cigage, age, and bp predicting the variable health. In step 2 you will report the predicted probabilities for each self-rated health category among those with diagnosed high or low blood pressure, respectively. In step 3 you will test any relevant assumptions. Based on the results of Step 3, what would you recommend as the next step in predicting self-rated health category?
 
-```{r}
-case2 <- rio::import("https://github.com/mp5782/RegressionFinal/blob/main/MIDUS%20III%20Final%20Exam%20Fall%202021.dta?raw=true")
+```{r, echo=F}
+case2 <- rio::import(here::here("MIDUS III Final Exam Fall 2021.dta"))
 
 #clean the data to exclude "don't know", "refused", "inapp" responses from the alcage, ciage variables
 case2 %<>% mutate_at(c("alcage", "cigage"), function(x) ifelse(x>96, NA, x))
@@ -30,7 +30,7 @@ case2 %<>% mutate(
 
 # Step 1. Univariate analysis
 
-```{r}
+```{r, echo=F}
 #outcome variable
 ggplot(case2, aes(health))+geom_bar()
 
@@ -40,7 +40,7 @@ table1(~factor(depress) + factor(bp) + factor(smoke) + factor(drink) + age + alc
 
 # Step 2. Bivariate analysis
 
-```{r}
+```{r, echo=F}
 # table
 table1(~factor(depress) + factor(bp) + age + alcage + cigage | health, data = case2)
 
@@ -55,7 +55,7 @@ for(var in c("depress", "bp", "age", "alcage", "cigage")){
 
 # Step 3. Fit the main effect regression model
 
-```{r}
+```{r, echo=F}
 main_mod  <- vglm(health ~ depress + alcage + cigage + age +bp, 
                         family=cumulative(parallel=TRUE), data=case2)
 
@@ -78,7 +78,7 @@ exp(res)
 
 # Step 4. Proportional odds assumption test
 
-```{r}
+```{r, echo=F}
 # check for proportional odds assumption
 polr_mod <- polr(health ~ depress + alcage + cigage + age +bp,
                  Hess = T, data = case2)
@@ -87,13 +87,13 @@ brant(polr_mod)
 
 # Step 5. Model fit (vs. the null model)
 
-```{r}
+```{r, echo=F}
 lrtest(main_mod)
 ```
 
 # Step 5. Predicted probability
 
-```{r}
+```{r, echo=F}
 fitted_bp <- data.frame(bp = case2$bp, fitted(main_mod))
 pb <- fitted_bp %>% group_by(bp) %>% summarize(mean(X1), mean(X2), mean(X3), mean(X4))
 
