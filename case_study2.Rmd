@@ -1,0 +1,110 @@
+---
+title: "Case study #2"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = F, warning = F)
+pacman::p_load(magrittr, dplyr, tidyverse, ggplot2, table1, VGAM, brant, MASS)
+ggthemr::ggthemr("fresh")
+```
+
+For the second case study you will be predicting self-rated health category for individuals in their midlife (outcome variable). Select the correct model based on the distribution of the outcome variable. In step 1 you will conduct the main effects model with the variables depress, alcage, cigage, age, and bp predicting the variable health. In step 2 you will report the predicted probabilities for each self-rated health category among those with diagnosed high or low blood pressure, respectively. In step 3 you will test any relevant assumptions. Based on the results of Step 3, what would you recommend as the next step in predicting self-rated health category?
+
+```{r}
+case2 <- rio::import(here::here("MIDUS III Final Exam Fall 2021.dta"))
+
+#clean the data to exclude "don't know", "refused", "inapp" responses from the alcage, ciage variables
+case2 %<>% mutate_at(c("alcage", "cigage"), function(x) ifelse(x>96, NA, x))
+
+# make the outcome variable as ordered factor (increasing order as health improves)
+case2 %<>% mutate(health = ordered(health, levels = c(4, 3, 2, 1)))
+
+# to account for those who never drank or smoke, create a corresponding dichotomous variable
+case2 %<>% mutate(
+  smoke = ifelse(cigage==96, 0, 1),
+  drink = ifelse(alcage==96, 0, 1)
+)
+
+```
+
+# Step 1. Univariate analysis
+
+```{r}
+#outcome variable
+ggplot(case2, aes(health))+geom_bar()
+
+# explanatory variables
+table1(~factor(depress) + factor(bp) + factor(smoke) + factor(drink) + age + alcage + cigage, data = case2)
+```
+
+# Step 2. Bivariate analysis
+
+```{r}
+# table
+table1(~factor(depress) + factor(bp) + age + alcage + cigage | health, data = case2)
+
+# univaraite cumulative logit
+for(var in c("depress", "bp", "age", "alcage", "cigage")){
+  temp <- case2[which(case2[,var]!=96),]
+  print(
+    vglm(case2$health ~ case2[,var], family=cumulative(parallel=TRUE)) %>% summary()
+  )
+}
+```
+
+# Step 3. Fit the main effect regression model
+
+```{r}
+main_mod  <- vglm(health ~ depress + alcage + cigage + age +bp, 
+                        family=cumulative(parallel=TRUE), data=case2)
+
+summary(main_mod)
+
+temp<-summary(main_mod)
+# Exponentiated coefficients
+res <- data.frame(
+coefficients = round(temp@coefficients,3),
+# 95% CI
+ci_low = round(temp@coef3[,1]-1.96*temp@coef3[,2],3),
+ci_high = round(temp@coef3[,1]+1.96*temp@coef3[,2], 3),
+#p-value
+pval =round(temp@coef3[,4],3)
+)
+
+res
+exp(res)
+```
+
+# Step 4. Proportional odds assumption test
+
+```{r}
+# check for proportional odds assumption
+polr_mod <- polr(health ~ depress + alcage + cigage + age +bp,
+                 Hess = T, data = case2)
+brant(polr_mod)
+```
+
+# Step 5. Model fit (vs. the null model)
+
+```{r}
+lrtest(main_mod)
+```
+
+# Step 5. Predicted probability
+
+```{r}
+fitted_bp <- data.frame(bp = case2$bp, fitted(main_mod))
+pb <- fitted_bp %>% group_by(bp) %>% summarize(mean(X1), mean(X2), mean(X3), mean(X4))
+
+pb
+pb %>% as.data.frame() %>% gather("health", "p", -bp) %>% mutate(
+  health = case_when(health=="mean(X1)" ~ "Excellent",
+                     health=="mean(X2)" ~ "Very good/Good",
+                     health=="mean(X3)" ~ "Fair",
+                     TRUE ~ "Poor"),
+  bp = ifelse(bp==1, "High blood pressure", "No high blood pressure")
+) %>% ggplot(aes(health, p)) + geom_bar(aes(group = bp, fill = factor(bp)),stat="identity", position = "dodge") +
+  theme(legend.title = element_blank(),
+        legend.position = "top")
+```
