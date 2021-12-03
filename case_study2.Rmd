@@ -9,7 +9,7 @@ pacman::p_load(magrittr, dplyr, tidyverse, ggplot2, table1, VGAM, brant, MASS)
 ggthemr::ggthemr("fresh")
 ```
 
-For the second case study you will be predicting self-rated health category for individuals in their midlife (outcome variable). Select the correct model based on the distribution of the outcome variable. In step 1 you will conduct the main effects model with the variables depress, alcage, cigage, age, and bp predicting the variable health. In step 2 you will report the predicted probabilities for each self-rated health category among those with diagnosed high or low blood pressure, respectively. In step 3 you will test any relevant assumptions. Based on the results of Step 3, what would you recommend as the next step in predicting self-rated health category?
+For the second case study you will be predicting self-rated health category for individuals in their midlife (`outcome` variable). Select the correct model based on the distribution of the outcome variable. In step 1 you will conduct the main effects model with the variables `depress`, `alcage`, `cigage`, `age`, and `bp` predicting the variable `health`. In step 2 you will report the predicted probabilities for each self-rated health category among those with diagnosed high or low blood pressure, respectively. In step 3 you will test any relevant assumptions. Based on the results of Step 3, what would you recommend as the next step in predicting self-rated health category?
 
 ```{r}
 case2 <- rio::import("https://github.com/mp5782/RegressionFinal/blob/main/MIDUS%20III%20Final%20Exam%20Fall%202021.dta?raw=true")
