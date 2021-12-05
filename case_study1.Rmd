@@ -1,0 +1,96 @@
+---
+title: "Case Study #1"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = F, warning = F)
+pacman::p_load(magrittr, dplyr, tidyverse, ggplot2, table1, VGAM, brant, MASS,haven,ResourceSelection,knitr)
+ggthemr::ggthemr("fresh")
+case1 <- read_dta("MIDUS III Final Exam Fall 2021.dta")
+```
+
+For the first study you will be predicting if people in their midlife have ever experienced heart trouble (outcome variable). Select the correct model based on the distribution of the outcome variable. In step 1 you will conduct a model with the variables `bp`, `smoke`, `age`, `male`, and `exercise` predicting the variable `heart.` In step 2 you will run the model with the interaction term between `smoke` and `male`, controlling for the other variables. In step 3 you will report at least 3 types of model fit statistics for each individual model, and assess which model (the main effects or interaction effect model) is better. Please use two tests to evaluate if there are significant outliers that may be influential in the model with the better fit.
+
+# Step 0. Univariate + bivariate analysis
+
+```{r 1.0,echo=F,comment=NA}
+# all variables
+table1(~age+factor(male)+factor(heart)+cigage+factor(smoke)+alcage+factor(depress)+factor(bp)+factor(exercise)+factor(health), data = case1)
+#outcome variable 1
+ggplot(case1, aes(heart))+geom_bar()
+#outcome variable 2
+ggplot(case1, aes(health))+geom_bar()
+#bivar, case 1
+table1(~age+factor(male)+cigage+factor(smoke)+alcage+factor(depress)+factor(bp)+factor(exercise)+factor(health)|factor(heart), data = case1)
+#bivar, case 2
+table1(~age+factor(male)+factor(heart)+cigage+factor(smoke)+alcage+factor(depress)+factor(bp)+factor(exercise)|factor(health), data = case1)
+```
+
+# Step 1. model variables `bp`, `smoke`, `age`, `male`, and `exercise` predicting the variable `heart`.
+
+```{r 1.1, echo=F,comment=NA}
+mod1.1 <- glm(heart ~ bp+factor(smoke)+age+factor(male)+factor(exercise), family = binomial, data = case1)
+summary(mod1.1)
+```
+
+# Step 2. model with the interaction term between `smoke` and `male`, controlling for the other variables.
+
+```{r 1.2, echo=F,comment=NA}
+mod1.2 <- glm(heart ~ bp+factor(smoke)+age+factor(male)+factor(exercise)+I(smoke*male), family = binomial, data = case1)
+summary(mod1.2)
+```
+
+# Step 3. report at least 3 types of model fit statistics for each individual model, and assess which model (the main effects or interaction effect model) is better
+
+ARE WE TALKING ABOUT ONLY TWO DIFFERENT MODELS HERE, OR 5 + 1 + 1 = 7?!
+
+```{r 1.3,echo=F,comment=NA,results='asis'}
+#Likelihood Ratio tests for each model vs. null:
+a1 <- pchisq(mod1.1$deviance,mod1.1$df.residual)
+a2 <- pchisq(mod1.2$deviance,mod1.2$df.residual)
+#Hosmer-Lemeshow Goodness of Fit:
+b1 <- hoslem.test(mod1.1$y,mod1.1$fitted.values,g=10)
+b2 <- hoslem.test(mod1.2$y,mod1.2$fitted.values,g=10)
+#AIC of each test
+c1 <- AIC(mod1.1)
+c2 <- AIC(mod1.2)
+#BIC of each test
+d1 <- BIC(mod1.1)
+d2 <- BIC(mod1.2)
+Evaluation <- c("Likelihood Ratio vs. Null","Hosmer&LemeshowGoodness of Fit","AIC","BIC")
+mod1 <- c(a1,b1$p.value,c1,d1)
+mod2 <- c(a2,b2$p.value,c2,d2)
+results <- data.frame("Evaluation"=Evaluation,"Main Effects Model"=mod1,"Interaction Effect Model"=mod2)
+kable(results)
+```
+
+# Step 4. use two tests to evaluate if there are significant outliers that may be influential in the model with the better fit.
+
+```{r 1.4,echo=F}
+case1_0 <- case1[case1$heart==0,] #data, no heart trouble
+case1_1 <- case1[case1$heart==1,] #data, heart trouble
+#pearson residuals
+stdres <- residuals(mod1.2,type='pearson')
+stdres_0 <- stdres[case1$heart==0] #pearson residuals, no heart trouble
+stdres_1 <- stdres[case1$heart==1] #pearson residuals, heart trouble
+plot(case1_0$M2ID,stdres_0,
+             main='Pearson Residuals, no heart trouble',
+             ylab='standardized Pearson residuals',
+             xlab='ID')
+
+plot(case1_1$M2ID,stdres_1,
+             main='Pearson Residuals, heart trouble', 
+             ylab='standardized Pearson residuals',
+             xlab='ID')
+#deviance reciduals
+deviance.res<-residuals(mod1.2,type='deviance')
+deviance.res_0<-deviance.res[case1$heart==0] #deviance residuals, no trouble
+deviance.res_1<-deviance.res[case1$heart==1] #deviance residuals, heart trouble
+plot(case1_0$M2ID,deviance.res_0,
+     ylab='Deviance Residuals',
+     xlab='ID')
+plot(case1_1$M2ID,deviance.res_1,
+     ylab='Deviance Residuals',
+     xlab='ID')
+```
