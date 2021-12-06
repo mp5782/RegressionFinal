@@ -74,23 +74,76 @@ case1_1 <- case1[case1$heart==1,] #data, heart trouble
 stdres <- residuals(mod1.2,type='pearson')
 stdres_0 <- stdres[case1$heart==0] #pearson residuals, no heart trouble
 stdres_1 <- stdres[case1$heart==1] #pearson residuals, heart trouble
-plot(case1_0$M2ID,stdres_0,
-             main='Pearson Residuals, no heart trouble',
-             ylab='standardized Pearson residuals',
-             xlab='ID')
+#plot(case1_0$M2ID,stdres_0,
+#             main='Pearson Residuals, no heart trouble',
+#             ylab='standardized Pearson residuals',
+#             xlab='ID')
 
-plot(case1_1$M2ID,stdres_1,
-             main='Pearson Residuals, heart trouble', 
-             ylab='standardized Pearson residuals',
-             xlab='ID')
+#plot(case1_1$M2ID,stdres_1,
+#             main='Pearson Residuals, heart trouble', 
+#             ylab='standardized Pearson residuals',
+#             xlab='ID')
+
+# combined plot
+data.frame(obs = 1:nrow(case1),
+            dep_var = case1$heart,
+           std_res = stdres) %>%
+  ggplot(aes(obs, std_res)) + geom_point(aes(color = factor(dep_var))) +
+  geom_hline(yintercept = -2, linetype = "dotted") +
+  geom_hline(yintercept = 2, linetype = "dotted") +
+  xlab("Observation") +
+  ylab("Standard residual")
+
 #deviance reciduals
 deviance.res<-residuals(mod1.2,type='deviance')
 deviance.res_0<-deviance.res[case1$heart==0] #deviance residuals, no trouble
 deviance.res_1<-deviance.res[case1$heart==1] #deviance residuals, heart trouble
-plot(case1_0$M2ID,deviance.res_0,
-     ylab='Deviance Residuals',
-     xlab='ID')
-plot(case1_1$M2ID,deviance.res_1,
-     ylab='Deviance Residuals',
-     xlab='ID')
+#plot(case1_0$M2ID,deviance.res_0,
+#     ylab='Deviance Residuals',
+#     xlab='ID')
+#plot(case1_1$M2ID,deviance.res_1,
+#     ylab='Deviance Residuals',
+#     xlab='ID')
+
+# combined plot
+data.frame(obs = 1:nrow(case1),
+            dep_var = case1$heart,
+           std_res = deviance.res) %>%
+  ggplot(aes(obs, std_res)) + geom_point(aes(color = factor(dep_var))) +
+  geom_hline(yintercept = 2, linetype = "dotted") +
+  geom_hline(yintercept = -2, linetype = "dotted") +
+  xlab("Observation") +
+  ylab("Deviance residual")
+
+# FIND EXTREME VALUES
+extreme<-data.frame(
+  obs = 1:nrow(case1),
+  pred = residuals(mod1.2),
+  stdres = stdres,
+  devres = deviance.res,
+  y = case1$heart
+)
+extreme %>% filter(abs(stdres)>2) %>% nrow()
+extreme %>% filter(abs(devres)>2) %>% nrow()
 ```
+
+Outliers: It seems that there are `r extreme %>% filter(abs(stdres)>2) %>% nrow()` observations that has the |standard residual value| >2, and `r extreme %>% filter(abs(devres)>2) %>% nrow()` observations that has the |deviance residual value| >2. All of them could be considered as outliers.
+
+
+```{r}
+# DF beta
+dfbeta<- stats::dfbeta(mod1.2) %>% 
+  cbind(obs = 1:nrow(case1),
+        heart = factor(case1$heart)) %>% as.data.frame()
+colnames(dfbeta) <- c("intercept", "bp", "smoke", "age", "male", "exercise", "smoke_male", "obs", "heart")
+
+for(var in colnames(dfbeta)){
+  if(var %in% c("intercept", "obs", "heart")) next
+  print(ggplot(dfbeta) + 
+          geom_point(aes_string("obs", var, color = "factor(heart)")) +
+          geom_hline(yintercept = 2/sqrt(nrow(case1))) +
+          geom_hline(yintercept = -2/sqrt(nrow(case1))))
+}
+```
+
+Influential points: However, it seems that none of those points change the coefficients significantly based on the size-adjusted cut-off value of |dfbeta| > 2/sqrt(n).
