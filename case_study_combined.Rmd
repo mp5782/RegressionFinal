@@ -1,0 +1,264 @@
+---
+title: "Case Study #1"
+output: word_document
+always_allow_html: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = F, warning = F)
+pacman::p_load(magrittr, dplyr, tidyverse, ggplot2, table1, VGAM, brant, MASS,haven,ResourceSelection,knitr, kableExtra)
+ggthemr::ggthemr("fresh")
+case <- rio::import("MIDUS III Final Exam Fall 2021.dta")
+```
+
+# Case study 1
+
+For the first study you will be predicting if people in their midlife have ever experienced heart trouble (outcome variable). Select the correct model based on the distribution of the outcome variable. In step 1 you will conduct a model with the variables `bp`, `smoke`, `age`, `male`, and `exercise` predicting the variable `heart.` In step 2 you will run the model with the interaction term between `smoke` and `male`, controlling for the other variables. In step 3 you will report at least 3 types of model fit statistics for each individual model, and assess which model (the main effects or interaction effect model) is better. Please use two tests to evaluate if there are significant outliers that may be influential in the model with the better fit.
+
+## Step 1. Univariate + bivariate analysis
+
+```{r 1.0}
+# Table 1
+table1(~age+factor(male)+factor(heart)+cigage+factor(smoke)+alcage+factor(depress)+factor(bp)+factor(exercise)+factor(health), data = case)
+
+# Distribution of outcome variable 
+ggpubr::ggarrange(
+#outcome variable 1
+  ggplot(case, aes(as.factor(heart)))+geom_bar() + xlab("Heart attack")+
+  scale_x_discrete(labels = c("No", "Yes"))+
+  theme(axis.text = element_text(size = 8)),
+#outcome variable 2
+  ggplot(case, aes(as.factor(health)))+geom_bar() + xlab("Self-rated health")+
+    scale_x_discrete(labels = c("Excellent", "Very good/Good", "Fair", "Poor"))+
+    theme(axis.text = element_text(size = 8)),
+  nrow = 1
+)
+
+#bivariate table for case 1
+table1(~age+factor(male)+cigage+factor(smoke)+alcage+factor(depress)+factor(bp)+factor(exercise)+factor(health)|factor(heart), data = case)
+
+#bivariate table for case 2
+table1(~age+factor(male)+factor(heart)+cigage+factor(smoke)+alcage+factor(depress)+factor(bp)+factor(exercise)|factor(health), data = case)
+```
+
+## Step 2. model variables `bp`, `smoke`, `age`, `male`, and `exercise` predicting the variable `heart`.
+
+```{r 1.1}
+mod1.1 <- glm(heart ~ bp+factor(smoke)+age+factor(male)+factor(exercise), 
+              family = binomial, data = case)
+summary(mod1.1)
+```
+
+## Step 3. model with the interaction term between `smoke` and `male`, controlling for the other variables.
+
+```{r 1.2}
+mod1.2 <- glm(heart ~ bp+factor(smoke)+age+factor(male)+factor(exercise)+I(smoke*male), 
+              family = binomial, data = case)
+summary(mod1.2)
+```
+
+## Step 4. report at least 3 types of model fit statistics for each individual model, and assess which model (the main effects or interaction effect model) is better
+
+
+```{r 1.3,echo=T,results='asis'}
+#Likelihood Ratio tests for each model vs. null:
+a1 <- pchisq(mod1.1$deviance,mod1.1$df.residual)
+a2 <- pchisq(mod1.2$deviance,mod1.2$df.residual)
+#Hosmer-Lemeshow Goodness of Fit:
+b1 <- hoslem.test(mod1.1$y,mod1.1$fitted.values,g=10)
+b2 <- hoslem.test(mod1.2$y,mod1.2$fitted.values,g=10)
+#AIC of each test
+c1 <- AIC(mod1.1)
+c2 <- AIC(mod1.2)
+#BIC of each test
+d1 <- BIC(mod1.1)
+d2 <- BIC(mod1.2)
+Evaluation <- c("Likelihood Ratio vs. Null","Hosmer&LemeshowGoodness of Fit","AIC","BIC")
+mod1 <- c(a1,b1$p.value,c1,d1)
+mod2 <- c(a2,b2$p.value,c2,d2)
+results <- data.frame("Evaluation"=Evaluation,"Main Effects Model"=mod1,"Interaction Effect Model"=mod2)
+kable(results, table.attr = "style='width:60%;'") %>% kable_classic(full_width = T, position = "center", )
+```
+
+## Step 5. use two tests to evaluate if there are significant outliers that may be influential in the model with the better fit.
+
+```{r 1.4,echo=T}
+case_0 <- case[case$heart==0,] #data, no heart trouble
+case_1 <- case[case$heart==1,] #data, heart trouble
+#pearson residuals
+stdres <- residuals(mod1.2,type='pearson')
+stdres_0 <- stdres[case$heart==0] #pearson residuals, no heart trouble
+stdres_1 <- stdres[case$heart==1] #pearson residuals, heart trouble
+#plot(case_0$M2ID,stdres_0,
+#             main='Pearson Residuals, no heart trouble',
+#             ylab='standardized Pearson residuals',
+#             xlab='ID')
+
+#plot(case_1$M2ID,stdres_1,
+#             main='Pearson Residuals, heart trouble', 
+#             ylab='standardized Pearson residuals',
+#             xlab='ID')
+
+# combined plot
+data.frame(obs = 1:nrow(case),
+            dep_var = case$heart,
+           std_res = stdres) %>%
+  ggplot(aes(obs, std_res)) + geom_point(aes(color = factor(dep_var))) +
+  geom_hline(yintercept = -2, linetype = "dotted") +
+  geom_hline(yintercept = 2, linetype = "dotted") +
+  xlab("Observation") +
+  ylab("Standard residual")
+
+#deviance reciduals
+deviance.res<-residuals(mod1.2,type='deviance')
+deviance.res_0<-deviance.res[case$heart==0] #deviance residuals, no trouble
+deviance.res_1<-deviance.res[case$heart==1] #deviance residuals, heart trouble
+#plot(case_0$M2ID,deviance.res_0,
+#     ylab='Deviance Residuals',
+#     xlab='ID')
+#plot(case_1$M2ID,deviance.res_1,
+#     ylab='Deviance Residuals',
+#     xlab='ID')
+
+# combined plot
+data.frame(obs = 1:nrow(case),
+            dep_var = case$heart,
+           std_res = deviance.res) %>%
+  ggplot(aes(obs, std_res)) + geom_point(aes(color = factor(dep_var))) +
+  geom_hline(yintercept = 2, linetype = "dotted") +
+  geom_hline(yintercept = -2, linetype = "dotted") +
+  xlab("Observation") +
+  ylab("Deviance residual")
+
+# FIND EXTREME VALUES
+extreme<-data.frame(
+  obs = 1:nrow(case),
+  pred = residuals(mod1.2),
+  stdres = stdres,
+  devres = deviance.res,
+  y = case$heart
+)
+extreme %>% filter(abs(stdres)>2) %>% nrow()
+extreme %>% filter(abs(devres)>2) %>% nrow()
+```
+
+Outliers: It seems that there are `r extreme %>% filter(abs(stdres)>2) %>% nrow()` observations that has the |standard residual value| >2, and `r extreme %>% filter(abs(devres)>2) %>% nrow()` observations that has the |deviance residual value| >2.
+
+
+```{r}
+# DF beta
+dfbeta<- stats::dfbeta(mod1.2) %>% 
+  cbind(obs = 1:nrow(case),
+        heart = factor(case$heart)) %>% as.data.frame()
+colnames(dfbeta) <- c("intercept", "bp", "smoke", "age", "male", "exercise", "smoke_male", "obs", "heart")
+
+p<-list()
+for(var in colnames(dfbeta)){
+  if(var %in% c("intercept", "obs", "heart")) next
+  p[[var]] <- ggplot(dfbeta) + 
+          geom_point(aes_string("obs", var, color = "factor(heart)"), size = 0.5) +
+          geom_hline(yintercept = 2/sqrt(nrow(case))) +
+          geom_hline(yintercept = -2/sqrt(nrow(case))) +
+    xlab("Observations") +
+    theme(legend.title = element_blank())+
+    scale_color_discrete(labels = c("No heart attack", "Heart attack"))
+}
+ggpubr::ggarrange(
+                  p[["bp"]],
+                  p[["smoke"]],
+                  p[["age"]],
+                  p[["male"]],
+                  p[["exercise"]],
+                  p[["smoke_male"]],
+                  nrow = 3,
+                  ncol = 2,
+                  common.legend = T)
+```
+
+Influential points: However, it seems that none of those points change the coefficients significantly, based on the cut-off value of |dfbeta| > 2/sqrt(n).
+
+
+# Cast study 2
+
+For the second case study you will be predicting self-rated health category for individuals in their midlife (outcome variable). Select the correct model based on the distribution of the outcome variable. In step 1 you will conduct the main effects model with the variables depress, alcage, cigage, age, and bp predicting the variable health. In step 2 you will report the predicted probabilities for each self-rated health category among those with diagnosed high or low blood pressure, respectively. In step 3 you will test any relevant assumptions. Based on the results of Step 3, what would you recommend as the next step in predicting self-rated health category?
+
+## Step 1. Bivariate analysis
+
+Univariate analysis is same as case study 1. 
+
+```{r}
+# table
+table1(~factor(depress) + factor(bp) + age + alcage + cigage | health, data = case)
+
+# univaraite cumulative logit
+for(var in c("depress", "bp", "age", "alcage", "cigage")){
+  print(
+    vglm(case$health ~ case[,var], family=cumulative(parallel=TRUE)) %>% summary()
+  )
+}
+```
+
+## Step 3. Fit the main effect regression model
+
+```{r}
+main_mod  <- vglm(health ~ depress + alcage + cigage + age +bp, 
+                        family=cumulative(parallel=TRUE), data=case)
+
+summary(main_mod)
+
+temp<-summary(main_mod)
+# Exponentiated coefficients
+res <- data.frame(
+coefficients = round(temp@coefficients,3),
+# 95% CI
+ci_low = round(temp@coef3[,1]-1.96*temp@coef3[,2],3),
+ci_high = round(temp@coef3[,1]+1.96*temp@coef3[,2], 3),
+#p-value
+pval =round(temp@coef3[,4],3)
+)
+
+res
+exp(res)
+```
+
+## Step 4. Proportional odds assumption test
+
+```{r}
+# check for proportional odds assumption
+polr_mod <- polr(factor(health, levels = c(4,3,2,1))~ depress + alcage + cigage + age +bp,
+                 Hess = T, data = case)
+brant(polr_mod)
+```
+
+## Step 5. Model fit (vs. the null model)
+
+```{r}
+lrtest(main_mod)
+```
+
+## Step 5. Predicted probability
+
+```{r}
+fitted_bp <- data.frame(bp = case$bp, fitted(main_mod))
+pb <- fitted_bp %>% group_by(bp) %>% summarize(mean(X1), mean(X2), mean(X3), mean(X4))
+
+pb
+plot_p <- pb %>% as.data.frame() %>% gather("health", "p", -bp) %>% mutate(
+  health = case_when(health=="mean(X1)" ~ "Excellent",
+                     health=="mean(X2)" ~ "Very good/Good",
+                     health=="mean(X3)" ~ "Fair",
+                     TRUE ~ "Poor"),
+  bp = ifelse(bp==1, "High blood pressure", "No high blood pressure")
+)
+
+plot_p %>% ggplot(aes(health, p)) + geom_bar(aes(group = bp, fill = factor(bp)),stat="identity", position = "dodge") +
+  theme(legend.title = element_blank(),
+        legend.position = "top")+
+  geom_text(data=plot_p %>% filter(bp=="High blood pressure"),
+          aes(label=round(p,3), group=bp),vjust= -2, hjust=1.5)+
+  geom_text(data=plot_p %>% filter(bp=="No high blood pressure"),
+          aes(label=round(p,3), group=bp),vjust= -2, hjust=-0.4)+
+  scale_y_continuous(limits=c(0,1))+
+  xlab("Self-rated health")+
+  ylab("Predicted probability")
+```
